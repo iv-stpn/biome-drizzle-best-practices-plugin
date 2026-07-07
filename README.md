@@ -141,7 +141,7 @@ npx @biomejs/biome lint example.ts
 
 Snapshot tests live in [tests/](tests/). Each case is a pair: `tests/fixtures/<name>.ts` (the source to lint)
 and `<name>.expected.json` (the diagnostics it should produce, as an order-independent array of
-`{ "line": <number>, "rule": "<slug>" }`). The runner ([tests/run.mjs](tests/run.mjs)) runs
+`{ "line": <number>, "rule": "<slug>" }`). The runner ([scripts/run-tests.mjs](scripts/run-tests.mjs)) runs
 `biome lint --reporter=json` on each fixture with only the plugin enabled and compares the extracted
 diagnostics against the expectation.
 

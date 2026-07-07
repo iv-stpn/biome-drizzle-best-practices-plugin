@@ -2,7 +2,7 @@
 	"plugins": ["../drizzle.grit"],
 	"linter": {
 		"rules": {
-			"recommended": false
+			"preset": "none"
 		}
 	}
 }
