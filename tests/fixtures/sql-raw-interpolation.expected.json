@@ -1,0 +1,3 @@
+[
+  { "line": 1, "rule": "no-sql-raw-interpolation" }
+]

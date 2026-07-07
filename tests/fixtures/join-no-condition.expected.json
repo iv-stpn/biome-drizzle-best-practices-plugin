@@ -1,0 +1,6 @@
+[
+  { "line": 1, "rule": "enforce-join-with-condition" },
+  { "line": 2, "rule": "enforce-join-with-condition" },
+  { "line": 3, "rule": "enforce-join-with-condition" },
+  { "line": 4, "rule": "enforce-join-with-condition" }
+]

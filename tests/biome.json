@@ -1,0 +1,8 @@
+{
+	"plugins": ["../drizzle.grit"],
+	"linter": {
+		"rules": {
+			"recommended": false
+		}
+	}
+}

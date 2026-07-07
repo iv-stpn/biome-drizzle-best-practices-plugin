@@ -1,0 +1,5 @@
+[
+  { "line": 1, "rule": "enforce-update-with-where" },
+  { "line": 2, "rule": "enforce-update-with-where" },
+  { "line": 3, "rule": "enforce-update-with-where" }
+]

@@ -1,0 +1,114 @@
+engine biome(1.0)
+language js
+
+// biome-drizzle-best-practices-plugin: Drizzle ORM safety & correctness rules.
+//
+// Structurally lints Drizzle query chains for the mistakes that quietly turn
+// into data loss or wrong results at runtime. Every rule reports a diagnostic
+// only (no auto-fix): the right correction is query-specific, so the plugin
+// flags the hazard and leaves the fix to the author.
+//
+// Rules:
+//   drizzle/enforce-delete-with-where   — `.delete()` without a `.where()`.
+//   drizzle/enforce-update-with-where   — `.update().set()` without a `.where()`.
+//   drizzle/enforce-join-with-condition — `.leftJoin(table)` etc. missing the `on` condition.
+//   drizzle/no-empty-where              — `.where()` called with no argument.
+//   drizzle/no-sql-raw-interpolation    — `sql.raw(`…${x}…`)` (SQL-injection risk).
+//
+// Ported from eslint-plugin-drizzle / biome-plugin-drizzle for the first two
+// rules; the remaining three are extra best-practice checks.
+
+// A method-call chain contains a `.where(...)` clause anywhere along it. Because
+// a chain like `db.delete(t).where(c)` parses with the `.delete(t)` call nested
+// *inside* the `.where(c)` call expression, an unguarded delete/update is one
+// that is NOT `within` any `.where()` call — the where clause, if present, is
+// always an ancestor of the earlier link in the chain.
+pattern has_where_ancestor() {
+    within `$_.where($_)`
+}
+
+// The set of join methods whose second argument is the `on` condition. Calling
+// any of them with a single argument (the joined table) omits the join
+// predicate, producing an unintended cross join / cartesian product.
+pattern join_method_name() {
+    or { `leftJoin`, `rightJoin`, `innerJoin`, `fullJoin` }
+}
+
+or {
+    // Rule: drizzle/enforce-delete-with-where
+    // Bad:  db.delete(users)
+    // Good: db.delete(users).where(eq(users.id, 1))
+    // A bare `.delete()` (or `.delete(table)`) with no `.where()` anywhere in the
+    // chain deletes every row in the table.
+    `$obj.delete($args)` as $call where {
+        not $call <: has_where_ancestor(),
+        register_diagnostic(
+            span = $call,
+            message = "[drizzle/enforce-delete-with-where] Missing .where() clause. Calling .delete() without .where() deletes all rows in the table. Use db.delete(table).where(...).",
+            severity = "error"
+        )
+    },
+
+    // Rule: drizzle/enforce-update-with-where
+    // Bad:  db.update(users).set({ name: "John" })
+    // Good: db.update(users).set({ name: "John" }).where(eq(users.id, 1))
+    // Matched at the `.set(...)` link (the point every update chain reaches),
+    // so `db.update(t).set(v).where(c)` is recognised as safe.
+    `$obj.update($table).set($values)` as $call where {
+        not $call <: has_where_ancestor(),
+        register_diagnostic(
+            span = $call,
+            message = "[drizzle/enforce-update-with-where] Missing .where() clause. Calling .update().set() without .where() updates all rows in the table. Use db.update(table).set(...).where(...).",
+            severity = "error"
+        )
+    },
+
+    // Rule: drizzle/enforce-join-with-condition
+    // Bad:  db.select().from(a).leftJoin(b)
+    // Good: db.select().from(a).leftJoin(b, eq(a.id, b.aId))
+    // A join method called with exactly one argument omits its `on` predicate.
+    // `$args <: [$table]` binds the whole argument list and asserts it has
+    // exactly one element, so the correct two-argument form is left untouched.
+    JsCallExpression(
+        callee = JsStaticMemberExpression(member = $method),
+        arguments = JsCallArguments(args = $args)
+    ) as $join where {
+        $method <: join_method_name(),
+        $args <: [$table],
+        register_diagnostic(
+            span = $join,
+            message = "[drizzle/enforce-join-with-condition] Join is missing its `on` condition. A join without a predicate produces a cartesian product. Pass the condition as the second argument, e.g. .leftJoin(table, eq(a.id, b.aId)).",
+            severity = "error"
+        )
+    },
+
+    // Rule: drizzle/no-empty-where
+    // Bad:  query.where()
+    // Good: query.where(eq(users.id, 1))
+    // A `.where()` with no argument is a no-op filter: it silently matches every
+    // row, defeating the very safety the delete/update rules enforce.
+    `$obj.where()` as $where where {
+        register_diagnostic(
+            span = $where,
+            message = "[drizzle/no-empty-where] Empty .where() clause matches all rows. Pass a condition, e.g. .where(eq(users.id, id)).",
+            severity = "error"
+        )
+    },
+
+    // Rule: drizzle/no-sql-raw-interpolation
+    // Bad:  sql.raw(`SELECT * FROM users WHERE id = ${userId}`)
+    // Good: sql`SELECT * FROM users WHERE id = ${userId}`   (parameterised)
+    //   or: sql.raw("SELECT * FROM users")                  (no interpolation)
+    // `sql.raw` bypasses parameterisation, so interpolating a value into its
+    // template literal splices it straight into the SQL string — a classic
+    // injection vector. The tagged `sql` template escapes interpolations safely;
+    // `sql.raw` with a plain string constant is fine and is left alone.
+    `sql.raw($arg)` as $raw where {
+        $arg <: JsTemplateExpression(elements = contains JsTemplateElement()),
+        register_diagnostic(
+            span = $raw,
+            message = "[drizzle/no-sql-raw-interpolation] Interpolating a value into sql.raw() risks SQL injection. Use the tagged `sql` template (sql`... ${value}`) for safe parameterisation, or sql.raw() only with a constant string.",
+            severity = "error"
+        )
+    }
+}

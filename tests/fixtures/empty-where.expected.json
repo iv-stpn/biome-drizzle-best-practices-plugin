@@ -1,0 +1,4 @@
+[
+  { "line": 1, "rule": "no-empty-where" },
+  { "line": 2, "rule": "no-empty-where" }
+]
