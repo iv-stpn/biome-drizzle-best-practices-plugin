@@ -1,6 +1,6 @@
 {
   "name": "biome-drizzle-best-practices-plugin",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Biome plugin that enforces Drizzle ORM best practices — join conditions, non-empty .where(), and safe sql.raw usage.",
   "license": "ISC",
   "author": "Ivan Stepanian <iv.stpn@gmail.com>",
